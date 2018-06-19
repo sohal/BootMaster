@@ -47,6 +47,7 @@
 
 /* Include Files */
 
+#include <bootINC.h>
 #include "sys_common.h"
 
 /* USER CODE BEGIN (1) */
@@ -58,7 +59,6 @@
 #include "het.h"
 #include "gio.h"
 #include "sci.h"
-#include "bootDrvSPI_LL.h"
 /* Define Task Handles */
 xTaskHandle xTask1Handle;
 xTaskHandle xTask2Handle;
@@ -78,12 +78,14 @@ void vTask1(void *pvParameters)
 /* Task2 */
 void vTask2(void *pvParameters)
 {
+    InitStateMachine();
+
     for(;;)
     {
         /* Taggle HET[1] with timer tick */
         gioSetBit(hetPORT1, 0, gioGetBit(hetPORT1, 0) ^ 1);
-        DrvSPI_LLTxRx("hello", 5);
-        vTaskDelay(500);
+        RunStateMachine();
+        vTaskDelay(5);
     }
 }
 
@@ -110,7 +112,6 @@ int main(void)
     gioSetDirection(hetPORT1, 0xFFFFFFFF);
     spiInit();
     sciInit();
-    DrvSPI_LLInit();
     /* Create Task 1 */
     if (xTaskCreate(vTask1,"Task1", configMINIMAL_STACK_SIZE, NULL, 1, &xTask1Handle) != pdTRUE)
     {
