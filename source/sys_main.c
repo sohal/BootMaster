@@ -58,7 +58,7 @@
 #include "het.h"
 #include "gio.h"
 #include "sci.h"
-#include "spi.h"
+#include "bootDrvSPI_LL.h"
 /* Define Task Handles */
 xTaskHandle xTask1Handle;
 xTaskHandle xTask2Handle;
@@ -78,18 +78,11 @@ void vTask1(void *pvParameters)
 /* Task2 */
 void vTask2(void *pvParameters)
 {
-    spiDAT1_t SPI3DataFormat;
-    SPI3DataFormat.CSNR = SPI_CS_0;
-    SPI3DataFormat.CS_HOLD = TRUE;
-    SPI3DataFormat.DFSEL = SPI_FMT_0;
-    SPI3DataFormat.WDEL = FALSE;
-
     for(;;)
     {
         /* Taggle HET[1] with timer tick */
         gioSetBit(hetPORT1, 0, gioGetBit(hetPORT1, 0) ^ 1);
-        sciDisplayText(scilinREG, "sohal/r", 6);
-        spiTransmitData(spiREG3, &SPI3DataFormat, 2, (uint16_t*)"hi");
+        DrvSPI_LLTxRx("hello", 5);
         vTaskDelay(500);
     }
 }
@@ -117,7 +110,7 @@ int main(void)
     gioSetDirection(hetPORT1, 0xFFFFFFFF);
     spiInit();
     sciInit();
-
+    DrvSPI_LLInit();
     /* Create Task 1 */
     if (xTaskCreate(vTask1,"Task1", configMINIMAL_STACK_SIZE, NULL, 1, &xTask1Handle) != pdTRUE)
     {
