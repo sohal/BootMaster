@@ -3,25 +3,27 @@
 #define BOOTINC_H_
 
 #include <stdint.h>
-#include <string.h>     /** For memset/memcpy */
-#include "spi.h"        /** For SPI Driver */
-#include "FreeRTOS.h"   /** For semaphore  */
-#include "os_semphr.h"  /** For semaphore  */
+#include <string.h>         /** For memset/memcpy */
+#include "spi.h"            /** For SPI Driver */
+#include "FreeRTOS.h"       /** For semaphore  */
+#include "os_semphr.h"      /** For semaphore  */
 #include "os_task.h"
-#include "Command.h"    /** For protocol commands */
-
-#include "External_WD.h" /** For firmware array */
+#include "Command.h"        /** For protocol commands */
+#include "gio.h"            /** For LED blinking */
+#include "het.h"            /** For LED blinking */
+#include "External_WD.h"    /** For firmware array */
 
 /**
 * @struct tDATA_PACKET
 * @brief Packet includes 64-byte blocks of data plus two-byte sequence count and two-byte CRC
 */
-#define BLOCK_SIZE  128U
+#define BLOCK_SIZE          128U
+#define PROTO_DATA_SIZE     64U
 typedef struct
 {
-    uint8_t  u8Data[BLOCK_SIZE];  /**< Data block     */
-    uint16_t u16SeqCnt;           /**< Sequence count */
-    uint16_t u16CRC;              /**< Two-byte CRC   */
+    uint8_t  u8Data[PROTO_DATA_SIZE];   /**< Data block     */
+    uint16_t u16SeqCnt;                 /**< Sequence count */
+    uint16_t u16CRC;                    /**< Two-byte CRC   */
 }tDATA_PACKET;
 
 /**
@@ -75,5 +77,5 @@ typedef enum {
 }tProtoState;
 
 void InitStateMachine(void);
-void RunStateMachine(void);
+uint8_t RunStateMachine(void);
 #endif // #define BOOTINC_H_

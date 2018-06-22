@@ -83,7 +83,6 @@ void vTask2(void *pvParameters)
     for(;;)
     {
         /* Taggle HET[1] with timer tick */
-        gioSetBit(hetPORT1, 0, gioGetBit(hetPORT1, 0) ^ 1);
         RunStateMachine();
         vTaskDelay(5);
     }
