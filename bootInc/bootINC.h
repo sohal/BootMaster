@@ -70,6 +70,8 @@ typedef enum {
     eWriteMemory,
     ePayloadReceive,
     ePayloadCheck,
+    ePayloadCRC,
+    ePayloadCRCCheck,
     eWriteAppCRC,
     eFinishUpdate,
     eFlashVerifyApplication,

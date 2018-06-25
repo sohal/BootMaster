@@ -190,12 +190,11 @@ uint8_t RunStateMachine(void)
         /*! Are we ready ? */
         if(eRES_OK == response)
         {
-
             /*! Check if was the last packet to be sent */
             if(mu16SequenceCounter > mu16FullPackets)
             {
                 /*! No more packet to send thus */
-                mtStateNext = eWriteAppCRC;
+                mtStateNext = ePayloadCRC;
             }else
             {
                 /*! Only then move to the next packet to be sent */
@@ -204,38 +203,30 @@ uint8_t RunStateMachine(void)
             }
         }else
         {
-            vTaskDelay(1000U);
             mtStateNext = ePayloadReceive;
         }
         break;
 
-    case eWriteAppCRC:
-        /*! Send STM command to write app crc */
-        Boot_SendCommand(eCMD_WriteCRC);
-        vTaskDelay(1U);
-        /*! Get response from STM */
-        response = (eRESPONSE_ID)Boot_GetResponse();
-        /*! Are we ready ? */
-        if(eRES_OK == response)
-        {
-            /** Proceed with the next command */
-            mtStateNext = eFlashVerifyApplication;
-        }
+    case ePayloadCRC:
+        /*! Prepare Payload to be sent */
+        Proto_PrepareCRCPacket();
+        /*! Send Payload to the STM */
+        Boot_SendData(mtPayload.bufferPLD, sizeof(tPldUnion));
+        vTaskDelay(200U);
+        mtStateNext = ePayloadCRCCheck;
         break;
 
-    case eFlashVerifyApplication:
-        /*! Compute CRC for the application */
-        Proto_PrepareCRCPacket();
-        /*! Send STM command to write app crc */
-        Boot_SendData(mtPayload.bufferPLD, 4U);
-        vTaskDelay(1000U);
+    case ePayloadCRCCheck:
         /*! Get response from STM */
         response = (eRESPONSE_ID)Boot_GetResponse();
         /*! Are we ready ? */
         if(eRES_OK == response)
         {
-            /** Proceed with the next command */
             mtStateNext = eFinishUpdate;
+        }else
+        {
+            vTaskDelay(1000U);
+            mtStateNext = ePayloadCRC;
         }
         break;
 
@@ -290,7 +281,7 @@ void Proto_PreparePacket(uint16_t pktCounter)
     uint8_t *pstartPosition = (pktCounter * PROTO_DATA_SIZE) + mpu8FileBuffer;
     uint16_t u16TxLen = PROTO_DATA_SIZE;
 
-    memset(mtPayload.packet.u8Data, 0U, PROTO_DATA_SIZE);
+    memset(mtPayload.packet.u8Data, 0xFFU, PROTO_DATA_SIZE);
     /**< If this is the last packet, we should calculate the u16TxLen from the remainder bytes */
     if(pktCounter == mu16FullPackets)
     {
@@ -314,14 +305,18 @@ void Proto_PrepareCRCPacket(void)
 {
     uint16_t i = 0;
 
-    memset(mtPayload.packet.u8Data, 0U, PROTO_DATA_SIZE);
+    memset(mtPayload.packet.u8Data, 0xFFU, PROTO_DATA_SIZE);
     /**< Copy all the relevant bytes from source to destination */
+    mtPayload.packet.u8Data[60] = (uint8_t)External_WD_length & 0xFFU;
+    mtPayload.packet.u8Data[61] = (uint8_t)(External_WD_length >> 8);
     /*! save CRC temporarily here in i */
     i = Proto_CRC(External_WD, External_WD_length, 0U);
-    mtPayload.bufferPLD[0] = (uint8_t)((i & 0xFF00U) >> 8U);
-    mtPayload.bufferPLD[1] = (uint8_t) (i & 0x00FFU);
-    mtPayload.bufferPLD[2] = (uint8_t)((External_WD_length & 0x0000FF00U) >> 8U);
-    mtPayload.bufferPLD[3] = (uint8_t) (External_WD_length & 0x000000FFU);
+    mtPayload.packet.u8Data[62] = (uint8_t)i & 0xFFU;
+    mtPayload.packet.u8Data[63] = (uint8_t)(i >> 8);
+    mtPayload.packet.u16SeqCnt = 0xBF01U;
+    /*! save CRC temporarily here in i */
+    i = Proto_CRC(mtPayload.packet.u8Data, PROTO_DATA_SIZE + 2U, 0U);
+    mtPayload.packet.u16CRC = ((i & 0xFF00) >> 8U) | ((uint16_t)(i & 0x00FF) << 8U);
 }
 
 /******************************************************************************/
