@@ -40,9 +40,9 @@ void SPI_LLInit(void)
     spi3Data.WDEL = FALSE;
     spiInitDone = TRUE;
     memset(spiBuffer, 0, sizeof(spiBuffer));
-    mpu8FileBuffer = (uint8_t*)External_WD;
-    mu16FullPackets = External_WD_length / PROTO_DATA_SIZE;
-    mu16PartialPackets = External_WD_length % PROTO_DATA_SIZE;
+    mpu8FileBuffer = (uint8_t*)GreenLED;
+    mu16FullPackets = GreenLED_length / PROTO_DATA_SIZE;
+    mu16PartialPackets = GreenLED_length % PROTO_DATA_SIZE;
     mtStateNext = eDefaultState;
     mtStateNow = eDefaultState;
     mu16StateCounter = 0U;
@@ -181,6 +181,7 @@ uint8_t RunStateMachine(void)
         /*! Send Payload to the STM */
         Boot_SendData(mtPayload.bufferPLD, sizeof(tPldUnion));
         vTaskDelay(200U);
+        gioSetBit(hetPORT1, 31, gioGetBit(hetPORT1, 31) ^ 1);
         mtStateNext = ePayloadCheck;
         break;
 
@@ -233,7 +234,8 @@ uint8_t RunStateMachine(void)
     case eFinishUpdate:
         /*! Send STM command to signal update has ended */
         Boot_SendCommand(eCMD_Finish);
-        vTaskDelay(1000U);
+        vTaskDelay(100U);
+        gioSetBit(hetPORT1, 31, 0);
         /*! Get response from STM */
         response = (eRESPONSE_ID)Boot_GetResponse();
         /*! Are we ready ? */
@@ -241,6 +243,7 @@ uint8_t RunStateMachine(void)
         {
             /** Proceed with the next command */
             mtStateNext = eStartAppCMD;
+            gioSetBit(hetPORT1, 0, 1);
         }
         break;
 
@@ -254,19 +257,32 @@ uint8_t RunStateMachine(void)
         break;
     }
 
+    /* Check if the same state is repeating, no transition suggests a
+     * hung state. We can count the stickyness of the software and reset
+     * to a known state.
+     */
     if(mtStateNow == mtStateNext)
     {
-        // sohal mu16StateCounter++;
+        if(eStartAppCMD != mtStateNow)
+        {
+            mu16StateCounter++;
+        }
+        else
+        {
+            mu16StateCounter = 0U;
+        }
+        /* If the timeout has expired, we reboot the system */
+        if(mu16StateCounter > 20)
+        {
+            mtStateNext = eDefaultState;
+            mu16StateCounter = 0U;
+        }
     }else
     {
+        /* Reset the sticky counter if the state transition takes place */
         mu16StateCounter = 0U;
     }
-    if(mu16StateCounter < 10U)
-    {
-        retVal = 0;
-    }
     mtStateNow = mtStateNext;
-    vTaskDelay(1U);
 
     return (retVal);
 }
@@ -307,12 +323,12 @@ void Proto_PrepareCRCPacket(void)
 
     memset(mtPayload.packet.u8Data, 0xFFU, PROTO_DATA_SIZE);
     /**< Copy all the relevant bytes from source to destination */
-    mtPayload.packet.u8Data[60] = (uint8_t)External_WD_length & 0xFFU;
-    mtPayload.packet.u8Data[61] = (uint8_t)(External_WD_length >> 8);
+    mtPayload.packet.u8Data[62] = (uint8_t)GreenLED_length & 0xFFU;
+    mtPayload.packet.u8Data[63] = (uint8_t)(GreenLED_length >> 8);
     /*! save CRC temporarily here in i */
-    i = Proto_CRC(External_WD, External_WD_length, 0U);
-    mtPayload.packet.u8Data[62] = (uint8_t)i & 0xFFU;
-    mtPayload.packet.u8Data[63] = (uint8_t)(i >> 8);
+    i = Proto_CRC(GreenLED, GreenLED_length, 0U);
+    mtPayload.packet.u8Data[60] = (uint8_t)i & 0xFFU;
+    mtPayload.packet.u8Data[61] = (uint8_t)(i >> 8);
     mtPayload.packet.u16SeqCnt = 0xBF01U;
     /*! save CRC temporarily here in i */
     i = Proto_CRC(mtPayload.packet.u8Data, PROTO_DATA_SIZE + 2U, 0U);

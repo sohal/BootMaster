@@ -47,7 +47,6 @@
 
 /* Include Files */
 
-#include <bootINC.h>
 #include "sys_common.h"
 
 /* USER CODE BEGIN (1) */
@@ -59,19 +58,23 @@
 #include "het.h"
 #include "gio.h"
 #include "sci.h"
+#include "spi.h"
+#include "reg_sci.h"
+#include "bootINC.h"
+
 /* Define Task Handles */
 xTaskHandle xTask1Handle;
 xTaskHandle xTask2Handle;
 void    sciDisplayText      (sciBASE_t *sci, uint8_t *text,uint32_t length);
 
-/* Task1 */
+/* Task1 for SD Card fat access */
 void vTask1(void *pvParameters)
 {
     for(;;)
     {
         /* Taggle HET[1] with timer tick */
         gioSetBit(hetPORT1, 17, gioGetBit(hetPORT1, 17) ^ 1);
-        vTaskDelay(100);
+        vTaskDelay(10);
     }
 }
 
@@ -80,6 +83,7 @@ void vTask2(void *pvParameters)
 {
     InitStateMachine();
 
+    sciDisplayText(scilinREG, "Hello", 5U);
     for(;;)
     {
         /* Taggle HET[1] with timer tick */
@@ -112,7 +116,7 @@ int main(void)
     spiInit();
     sciInit();
     /* Create Task 1 */
-    if (xTaskCreate(vTask1,"Task1", configMINIMAL_STACK_SIZE, NULL, 1, &xTask1Handle) != pdTRUE)
+    if (xTaskCreate(vTask1,"Task1_SD", configMINIMAL_STACK_SIZE, NULL, 1, &xTask1Handle) != pdTRUE)
     {
         /* Task could not be created */
         while(1);

@@ -11,7 +11,7 @@
 #include "Command.h"        /** For protocol commands */
 #include "gio.h"            /** For LED blinking */
 #include "het.h"            /** For LED blinking */
-#include "External_WD.h"    /** For firmware array */
+#include "GreenLED.h"       /** For firmware array */
 
 /**
 * @struct tDATA_PACKET
