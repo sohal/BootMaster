@@ -7,12 +7,15 @@
 
 #include <bootINC.h>
 static void SPI_RxTx(uint8_t *pbuffer, uint16_t size);
-static void SPI_LLInit(void);
+static void SCI_Rx(uint8_t *pbuffer, uint16_t size);
+static void SCI_Tx(uint8_t *pbuffer, uint16_t size);
+static void Boot_BSPInit(void);
 static uint16_t Proto_CRC(const uint8_t *data, uint16_t size, uint16_t startVal);
 static void Proto_PreparePacket(uint16_t pktCounter);
 static void Proto_PrepareCRCPacket(void);
 static const uint16_t cu16CRC16 = 0xAA55U;
 static SemaphoreHandle_t xSemaphore;
+static uint8_t sciBuffer[BLOCK_SIZE] = {0};
 static uint16_t spiBuffer[BLOCK_SIZE] = {0};
 static spiDAT1_t spi3Data;
 static uint32_t spiInitDone = 0;
@@ -23,6 +26,8 @@ static uint16_t mu16PartialPackets = 0U;
 static tProtoState mtStateNow, mtStateNext;
 static uint16_t mu16StateCounter;
 static uint16_t mu16SequenceCounter;
+static void (*bspSend)(uint8_t *pbuffer, uint16_t size) = NULL;
+static void (*bspRecv)(uint8_t *pbuffer, uint16_t size) = NULL;
 /**
  * void SPI_LLInit(void)
  * @brief The low level initialization of SPI Master in TMS570 SPI3
@@ -32,7 +37,7 @@ static uint16_t mu16SequenceCounter;
  * The semaphore is assigned here.
  * The SPI local buffer is cleared
  */
-void SPI_LLInit(void)
+void Boot_BSPInit(void)
 {
     vSemaphoreCreateBinary( xSemaphore );
     spi3Data.CS_HOLD = TRUE;
@@ -40,6 +45,7 @@ void SPI_LLInit(void)
     spi3Data.WDEL = FALSE;
     spiInitDone = TRUE;
     memset(spiBuffer, 0, sizeof(spiBuffer));
+    memset(sciBuffer, 0, sizeof(sciBuffer));
     mpu8FileBuffer = (uint8_t*)GreenLED;
     mu16FullPackets = GreenLED_length / PROTO_DATA_SIZE;
     mu16PartialPackets = GreenLED_length % PROTO_DATA_SIZE;
@@ -47,8 +53,37 @@ void SPI_LLInit(void)
     mtStateNow = eDefaultState;
     mu16StateCounter = 0U;
     mu16SequenceCounter = 0U;
+#ifdef PILOT
+    bspSend = &SCI_Tx;
+    bspRecv = &SCI_Rx;
+    sciSetBaudrate(sciREG, 57600UL);
+#else
+    bspSend = &SPI_RxTx;
+    bspRecv = &SPI_RxTx;
+#endif
 }
 
+void SCI_Tx(uint8_t *pbuffer, uint16_t size)
+{
+    memcpy(sciBuffer, pbuffer, size);
+    if(xSemaphore != NULL)
+    {
+        xSemaphoreTake(xSemaphore, 0);
+        sciSend(sciREG, size, sciBuffer);
+        xSemaphoreGive(xSemaphore);
+    }
+}
+
+void SCI_Rx(uint8_t *pbuffer, uint16_t size)
+{
+    if(xSemaphore != NULL)
+    {
+        xSemaphoreTake(xSemaphore, 0);
+        sciReceive(sciREG, size, sciBuffer);
+        xSemaphoreGive(xSemaphore);
+    }
+    memcpy(pbuffer, sciBuffer, size);
+}
 void SPI_RxTx(uint8_t *pbuffer, uint16_t size)
 {
     uint16_t i = 0;
@@ -83,7 +118,7 @@ void SPI_RxTx(uint8_t *pbuffer, uint16_t size)
  */
 void Boot_SendData(uint8_t *block, uint8_t length)
 {
-    SPI_RxTx(block, length);
+    (*bspSend)(block, length);
 }
 
 /**
@@ -95,8 +130,7 @@ void Boot_SendCommand(uint16_t command)
     uint8_t cmd[2];
     cmd[0] = (uint8_t)((command) & 0xFF);
     cmd[1] = (uint8_t)((command >> 8) & 0xFF);
-
-    SPI_RxTx(cmd, sizeof(uint16_t));
+    (*bspSend)(cmd, sizeof(uint16_t));
 }
 
 /**
@@ -107,7 +141,7 @@ uint16_t Boot_GetResponse(void)
 {
     uint16_t retVal;
     uint8_t ui8Data[2] = {0,0};
-    SPI_RxTx(ui8Data, 2);
+    (*bspRecv)(ui8Data, 2U);
     retVal = (spiBuffer[0] & 0xFFU) | ((uint16_t)(spiBuffer[1] & 0x00FFU) << 8U);
     return (retVal);
 }
@@ -118,7 +152,7 @@ uint16_t Boot_GetResponse(void)
  */
 void InitStateMachine(void)
 {
-    SPI_LLInit();
+    Boot_BSPInit();
 }
 /**
  * @brief Reads the last response from SPI device
@@ -126,7 +160,7 @@ void InitStateMachine(void)
  */
 uint8_t RunStateMachine(void)
 {
-    eRESPONSE_ID response;
+    eRESPONSE_ID response = eRES_Abort;
     uint8_t retVal = 1;
 
     switch (mtStateNow)

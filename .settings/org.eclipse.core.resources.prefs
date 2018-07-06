@@ -1,8 +1,8 @@
 eclipse.preferences.version=1
-encoding//Debug/bootSrc/subdir_rules.mk=UTF-8
-encoding//Debug/bootSrc/subdir_vars.mk=UTF-8
-encoding//Debug/makefile=UTF-8
-encoding//Debug/objects.mk=UTF-8
-encoding//Debug/source/subdir_rules.mk=UTF-8
-encoding//Debug/source/subdir_vars.mk=UTF-8
-encoding//Debug/sources.mk=UTF-8
+encoding//PILOT/bootSrc/subdir_rules.mk=UTF-8
+encoding//PILOT/bootSrc/subdir_vars.mk=UTF-8
+encoding//PILOT/makefile=UTF-8
+encoding//PILOT/objects.mk=UTF-8
+encoding//PILOT/source/subdir_rules.mk=UTF-8
+encoding//PILOT/source/subdir_vars.mk=UTF-8
+encoding//PILOT/sources.mk=UTF-8

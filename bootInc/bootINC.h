@@ -5,6 +5,8 @@
 #include <stdint.h>
 #include <string.h>         /** For memset/memcpy */
 #include "spi.h"            /** For SPI Driver */
+#include "sci.h"            /** For SCI Driver */
+#include "reg_sci.h"        /** For SCI register definition */
 #include "FreeRTOS.h"       /** For semaphore  */
 #include "os_semphr.h"      /** For semaphore  */
 #include "os_task.h"
