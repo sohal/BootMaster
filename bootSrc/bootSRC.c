@@ -363,7 +363,12 @@ void Proto_PrepareCRCPacket(void)
     i = Proto_CRC(GreenLED, GreenLED_length, 0U);
     mtPayload.packet.u8Data[60] = (uint8_t)i & 0xFFU;
     mtPayload.packet.u8Data[61] = (uint8_t)(i >> 8);
+    /* Calculate the block size based on the available flash size. big endian format */
+#ifdef PILOT
+    mtPayload.packet.u16SeqCnt = 0xBF00U;
+#else
     mtPayload.packet.u16SeqCnt = 0xBF01U;
+#endif
     /*! save CRC temporarily here in i */
     i = Proto_CRC(mtPayload.packet.u8Data, PROTO_DATA_SIZE + 2U, 0U);
     mtPayload.packet.u16CRC = ((i & 0xFF00) >> 8U) | ((uint16_t)(i & 0x00FF) << 8U);
